@@ -29,7 +29,7 @@
 // ==========================================
 
 // WiFi credentials
-const char* ssid = "conmeo";
+const char* ssid = "con meo";
 const char* password = "meomeomeo";
 
 // Static IP Configuration - Đã tắt để tự động nhận IP (DHCP)
@@ -39,8 +39,9 @@ const char* password = "meomeomeo";
 // IPAddress primaryDNS(8, 8, 8, 8);            // Google DNS
 
 // Backend server
-String serverHost = "10.232.98.107";  // IP máy chạy backend (sẽ tự động cập nhật qua UDP Broadcast)
+String serverHost = "10.150.115.107";  // IP máy chạy backend (sẽ tự động cập nhật qua UDP Broadcast)
 const int serverPort = 8080;
+
 
 WiFiUDP udp;
 const int udpPort = 12345;
@@ -401,12 +402,50 @@ void setup() {
 }
 
 // ============================================================
+// HTTP TRIGGER POLLING (Dành cho HTTP Bridge)
+// ============================================================
+void checkHttpTrigger() {
+  static unsigned long lastPollTime = 0;
+  unsigned long now = millis();
+  
+  // Chỉ poll mỗi 300ms
+  if (now - lastPollTime < 300) {
+    return;
+  }
+  lastPollTime = now;
+  
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+  
+  HTTPClient http;
+  String url = "http://" + serverHost + ":" + String(serverPort) + "/api/trigger/check";
+  http.begin(url);
+  http.setTimeout(1500); // 1.5s timeout
+  
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    String payload = http.getString();
+    
+    // Parse kiểm tra: {"trigger": true}
+    if (payload.indexOf("\"trigger\":true") >= 0) {
+      Serial.println("[HTTP Poll] Da nhan tin hieu trigger tu server!");
+      triggerReceived = true;
+    }
+  }
+  http.end();
+}
+
+// ============================================================
 // MAIN LOOP
 // ============================================================
 
 void loop() {
+  // Kiểm tra tín hiệu trigger từ HTTP server
+  checkHttpTrigger();
+
   // Kiểm tra điều kiện chụp ảnh:
-  // 1. Có trigger từ ESP-NOW
+  // 1. Có trigger từ ESP-NOW hoặc HTTP Poll
   // 2. Camera sẵn sàng
   // 3. Đã hết thời gian cooldown (tránh spam)
   
@@ -430,6 +469,7 @@ void loop() {
   
   delay(5);  // Giảm CPU usage
 }
+
 
 // ============================================================
 // HELPER FUNCTIONS

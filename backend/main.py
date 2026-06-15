@@ -96,6 +96,11 @@ ANTI_SPOOF_ENABLED = True  # Mặc định BẬT
 RECOGNITION_LOCK = threading.Lock()
 LAST_RECOGNITION_RESULT = {"timestamp": 0, "message": "Ready"}
 
+# HTTP Trigger Bridge for ESP32 -> ESP32-CAM
+TRIGGER_FLAG = False
+TRIGGER_LOCK = threading.Lock()
+
+
 
 # ===================================
 # AUTO-END SESSION BACKGROUND TASK
@@ -837,6 +842,32 @@ def api_get_latest_result():
     """
     with RECOGNITION_LOCK:
         return LAST_RECOGNITION_RESULT
+
+
+@app.post("/api/trigger")
+def api_post_trigger():
+    """
+    Endpoint cho Main ESP32 gửi trigger khi phát hiện chuyển động
+    """
+    global TRIGGER_FLAG
+    with TRIGGER_LOCK:
+        TRIGGER_FLAG = True
+    print("\n[HTTP Bridge] Da nhan tin hieu trigger tu ESP32!")
+    return {"status": "success", "message": "Trigger registered"}
+
+
+@app.get("/api/trigger/check")
+def api_check_trigger():
+    """
+    Endpoint cho ESP32-CAM poll để kiểm tra tín hiệu trigger
+    """
+    global TRIGGER_FLAG
+    with TRIGGER_LOCK:
+        has_trigger = TRIGGER_FLAG
+        if has_trigger:
+            TRIGGER_FLAG = False  # Reset flag ngay sau khi camera lấy đi
+    return {"trigger": has_trigger}
+
 
 
 @app.get("/api/camera/stream_url")
